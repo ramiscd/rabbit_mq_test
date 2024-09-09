@@ -4,25 +4,26 @@
 require 'bunny'
 
 #criando a conexão
-connection = Bunny.new
+connection = Bunny.new(automatically_recover: false)
 connection.start
 
 # criando canal
 channel = connection.create_channel
 
 # Declarando a mesma fila para escutar as mensagens
-queue = channel.queue('hello')
+queue = channel.queue('task_queue', durable: true)
 
-# Recebendo a mensagem da fila
-# puts '[*] Esperando por mensagens. para sair aperte control+C'
-# queue.subscribe(block: true) do | _delivery_info, _properties, body |
-#     puts " [x] Recived #{body}"
-# end
+channel.prefetch(1)
+puts " [*] Weating for messages. press control+C to exit"
 
-queue.subscribe(block: true) do | delivery_info , _properties, body |
-    puts "[x] Received #{body}"
-    #imitate some work
-
-    sleep body.count('.').to_i
-    puts ' [x] done'
+begin
+    queue.subscribe(manual_ack: true, block: true) do | delivery_info , _properties, body |
+        puts "[x] Received #{body}"
+        #imitate some work
+        sleep body.count('.').to_i
+        puts ' [x] done'
+        channel.ack(delivery_info.delivery_tag)
+    end
+rescue Interrupt =>_
+    connection.close
 end
